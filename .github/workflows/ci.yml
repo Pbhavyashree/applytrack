@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: applytrack
+          POSTGRES_USER: applytrack
+          POSTGRES_PASSWORD: applytrack
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U applytrack" --health-interval 5s --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: ci-only
+      DATABASE_URL: postgres://applytrack:applytrack@localhost:5432/applytrack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py check --deploy --fail-level WARNING
+      - run: pytest

@@ -1,0 +1,13 @@
+{% extends "tracker/base.html" %}
+{% block title %}Sign in · Applytrack{% endblock %}
+{% block content %}
+<form method="post" class="card" style="max-width:380px;margin:40px auto 0">
+  {% csrf_token %}
+  <h1 style="margin-bottom:14px">Sign in</h1>
+  {% if form.errors %}<p style="color:var(--bad)">That username and password didn't match.</p>{% endif %}
+  <p><label for="id_username">Username</label><input id="id_username" name="username" autocomplete="username" required></p>
+  <p><label for="id_password">Password</label><input id="id_password" type="password" name="password" autocomplete="current-password" required></p>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button class="btn btn-primary" style="width:100%">Sign in</button>
+</form>
+{% endblock %}

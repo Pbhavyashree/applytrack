@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Applytrack{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #f5f5f2; --card: #fff; --ink: #1c1c1a; --muted: #6a6963; --line: #e3e1da; --accent: #2f4fbf;
+      --good: #1f7a4d; --warn: #a86b12; --bad: #a33a3a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #151514; --card: #1f1f1d; --ink: #f0eee7; --muted: #a19f97; --line: #33322e;
+              --accent: #8ea6ff; --good: #55c08c; --warn: #e0a948; --bad: #e07272; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+           font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    a { color: var(--accent); }
+    header { display: flex; gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line);
+             background: var(--card); flex-wrap: wrap; }
+    header .brand { font-weight: 700; color: var(--ink); text-decoration: none; margin-right: auto; }
+    header nav { display: flex; gap: 14px; align-items: center; }
+    header nav a { color: var(--muted); text-decoration: none; }
+    header nav a:hover { color: var(--ink); }
+    header form button { background: none; border: 0; color: var(--muted); font: inherit; cursor: pointer; padding: 0; }
+    main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 40px; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    h2 { font-size: 1rem; margin: 0 0 10px; }
+    .muted { color: var(--muted); }
+    .small { font-size: .85rem; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+    .btn { display: inline-block; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--card); color: var(--ink); font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tag { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+           border: 1px solid var(--line); color: var(--muted); }
+    .messages { list-style: none; padding: 0; margin: 0 0 14px; }
+    .messages li { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); margin-bottom: 6px; }
+    .messages .error { border-color: var(--bad); color: var(--bad); }
+    form p { margin: 0 0 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; }
+    input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+           background: var(--bg); color: var(--ink); font: inherit; }
+    input[type=checkbox] { width: auto; }
+    .errorlist { color: var(--bad); margin: 4px 0 0; padding-left: 18px; }
+    .helptext { color: var(--muted); font-size: .85rem; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <a class="brand" href="{% url 'dashboard' %}">Applytrack</a>
+    {% if user.is_authenticated %}
+      <nav>
+        <a href="{% url 'dashboard' %}">Pipeline</a>
+        <a href="{% url 'closed' %}">Closed</a>
+        <a href="{% url 'import' %}">Import</a>
+        <a href="{% url 'add' %}" class="btn btn-primary">Add</a>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Sign out</button></form>
+      </nav>
+    {% endif %}
+  </header>
+  <main>
+    {% if messages %}
+      <ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

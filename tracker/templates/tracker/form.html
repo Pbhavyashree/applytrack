@@ -1,0 +1,10 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ title }} · Applytrack{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" class="card" style="max-width:560px;margin-top:12px">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

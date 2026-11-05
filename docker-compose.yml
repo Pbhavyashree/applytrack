@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: applytrack
+      POSTGRES_USER: applytrack
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U applytrack"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://applytrack:${POSTGRES_PASSWORD}@db:5432/applytrack
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8004:8000"   # Caddy on the host proxies to this
+    restart: unless-stopped
+
+volumes:
+  pgdata:

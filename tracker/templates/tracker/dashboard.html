@@ -1,0 +1,90 @@
+{% extends "tracker/base.html" %}
+{% block head %}
+<style>
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0 18px; }
+  .stat .n { font-size: 1.5rem; font-weight: 700; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { padding: 8px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; }
+  .list li:first-child { border-top: 0; }
+  .board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+  .col { background: transparent; }
+  .col h2 { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); }
+  .app { display: block; text-decoration: none; color: var(--ink); margin-bottom: 8px; padding: 10px 12px; }
+  .app:hover { border-color: var(--accent); }
+  .app .role { font-weight: 600; }
+  .overdue { color: var(--warn); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  td, th { text-align: left; padding: 6px 4px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  td.num, th.num { text-align: right; }
+</style>
+{% endblock %}
+{% block content %}
+<h1>Pipeline</h1>
+<p class="muted small">{{ stats.active }} active · {{ closed_count }} closed</p>
+
+<div class="stats">
+  <div class="card stat"><div class="n">{{ stats.applied }}</div><div class="muted small">Applied</div></div>
+  <div class="card stat"><div class="n">{% if stats.response_rate is not None %}{% widthratio stats.response_rate 1 100 %}%{% else %}—{% endif %}</div><div class="muted small">Got a reply</div></div>
+  <div class="card stat"><div class="n">{% if stats.interview_rate is not None %}{% widthratio stats.interview_rate 1 100 %}%{% else %}—{% endif %}</div><div class="muted small">Reached interview</div></div>
+  <div class="card stat"><div class="n">{{ stats.offers }}</div><div class="muted small">Offers</div></div>
+  <div class="card stat"><div class="n">{% if stats.median_days_to_response is not None %}{{ stats.median_days_to_response|floatformat:"0" }}d{% else %}—{% endif %}</div><div class="muted small">Median time to reply</div></div>
+</div>
+
+<div class="split">
+  <div class="card">
+    <h2>Follow up</h2>
+    {% if follow_ups %}
+      <ul class="list">
+        {% for a in follow_ups %}
+          <li><a href="{% url 'detail' a.pk %}">{{ a.role }} · {{ a.company }}</a>
+              <span class="small {% if a.next_follow_up < today %}overdue{% else %}muted{% endif %}">{{ a.next_follow_up|date:"j M" }}</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}<p class="muted small">Nothing due.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Coming up</h2>
+    {% if upcoming %}
+      <ul class="list">
+        {% for iv in upcoming %}
+          <li><a href="{% url 'detail' iv.application.pk %}">{{ iv.get_kind_display }} · {{ iv.application.company }}</a>
+              <span class="small muted">{{ iv.scheduled_at|date:"D j M, H:i" }}</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}<p class="muted small">No interviews booked.</p>{% endif %}
+  </div>
+</div>
+
+<div class="board">
+  {% for col in columns %}
+    <section class="col">
+      <h2><span>{{ col.label }}</span><span>{{ col.apps|length }}</span></h2>
+      {% for a in col.apps %}
+        <a class="card app" href="{% url 'detail' a.pk %}">
+          <div class="role">{{ a.role }}</div>
+          <div class="muted small">{{ a.company }}{% if a.location %} · {{ a.location }}{% endif %}</div>
+          {% if a.applied_on %}<div class="muted small">Applied {{ a.applied_on|date:"j M" }}</div>{% endif %}
+        </a>
+      {% empty %}
+        <p class="muted small">—</p>
+      {% endfor %}
+    </section>
+  {% endfor %}
+</div>
+
+{% if stats.by_source %}
+  <div class="card" style="margin-top:18px;max-width:520px">
+    <h2>Reply rate by source</h2>
+    <table>
+      <tr><th>Source</th><th class="num">Applied</th><th class="num">Replied</th><th class="num">Rate</th></tr>
+      {% for s in stats.by_source %}
+        <tr><td>{{ s.label }}</td><td class="num">{{ s.applied }}</td><td class="num">{{ s.responded }}</td>
+            <td class="num">{% widthratio s.response_rate 1 100 %}%</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endif %}
+{% endblock %}
