@@ -172,3 +172,13 @@ def test_import_semicolon_csv_from_german_excel(user):
     result = services.import_csv(user, text)
     assert result.created == 1 and result.errors == []
     assert Application.objects.get().applied_on == datetime.date(2026, 10, 14)
+
+
+def test_deleting_a_user_removes_their_data_but_companies_stay_protected(make_app, user):
+    from django.db.models import RestrictedError
+
+    app = make_app()
+    with pytest.raises(RestrictedError):
+        app.company.delete()
+    user.delete()
+    assert not Application.objects.exists() and not Company.objects.exists()

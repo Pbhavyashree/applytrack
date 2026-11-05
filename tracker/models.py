@@ -74,7 +74,7 @@ class Company(models.Model):
 
 class Application(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="applications")
-    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="applications")
+    company = models.ForeignKey(Company, on_delete=models.RESTRICT, related_name="applications")
     role = models.CharField(max_length=160)
     job_url = models.URLField(blank=True, max_length=500)
     location = models.CharField(max_length=120, blank=True)
