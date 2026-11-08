@@ -1,90 +1,153 @@
 {% extends "tracker/base.html" %}
 {% block head %}
 <style>
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0 18px; }
-  .stat .n { font-size: 1.5rem; font-weight: 700; }
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
-  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
-  .list { list-style: none; margin: 0; padding: 0; }
-  .list li { padding: 8px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; }
-  .list li:first-child { border-top: 0; }
-  .board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
-  .col { background: transparent; }
-  .col h2 { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); }
-  .app { display: block; text-decoration: none; color: var(--ink); margin-bottom: 8px; padding: 10px 12px; }
-  .app:hover { border-color: var(--accent); }
-  .app .role { font-weight: 600; }
-  .overdue { color: var(--warn); font-weight: 600; }
-  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-  td, th { text-align: left; padding: 6px 4px; border-top: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 600; border-top: 0; }
-  td.num, th.num { text-align: right; }
+  .head { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi .n { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+  @media (max-width: 720px) { .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+  .kpi .sub { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+
+  .breakdown { margin-top: 12px; }
+  .bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--line); margin: 10px 0 12px; }
+  .bar span { display: block; height: 100%; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .88rem; }
+  .legend a { color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .legend a:hover { text-decoration: underline; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+
+  .attention { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+  .mini { list-style: none; margin: 0; padding: 0; }
+  .mini li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: .92rem; }
+  .mini li:first-child { border-top: 0; }
+  .overdue { color: var(--warn); font-weight: 600; white-space: nowrap; }
+
+  .toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin: 22px 0 10px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+         background: var(--card); color: var(--ink); text-decoration: none; font-size: .88rem; font-weight: 600; }
+  .tab .c { color: var(--muted); font-weight: 500; }
+  .tab.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .tab.on .c { color: var(--bg); opacity: .75; }
+  .search { display: flex; gap: 6px; }
+  .search input { width: 220px; padding: 7px 10px; }
+
+  .list { padding: 0; overflow: hidden; }
+  .row { display: grid; grid-template-columns: minmax(0, 2.6fr) 1.1fr 0.9fr 1fr 1fr; gap: 12px; align-items: center;
+         padding: 11px 16px; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+  .row:hover { background: var(--bg); }
+  .row.headrow { border-top: 0; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 10px; padding-bottom: 8px; }
+  .row.headrow:hover { background: none; }
+  .who .role { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who .co { color: var(--muted); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 600; white-space: nowrap; }
+  .cell { font-size: .88rem; color: var(--muted); white-space: nowrap; }
+  .empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+  @media (max-width: 720px) {
+    .row { grid-template-columns: 1fr auto; }
+    .row .hide-sm, .row.headrow { display: none; }
+  }
+
+  .tone-progress { --tone: var(--t-progress); } .tone-interview { --tone: var(--t-interview); }
+  .tone-good { --tone: var(--t-good); } .tone-bad { --tone: var(--t-bad); } .tone-muted { --tone: var(--t-muted); }
+  .dot { background: var(--tone); } .badge { color: var(--tone); } .bar span { background: var(--tone); }
 </style>
 {% endblock %}
 {% block content %}
-<h1>Pipeline</h1>
-<p class="muted small">{{ stats.active }} active · {{ closed_count }} closed</p>
-
-<div class="stats">
-  <div class="card stat"><div class="n">{{ stats.applied }}</div><div class="muted small">Applied</div></div>
-  <div class="card stat"><div class="n">{% if stats.response_rate is not None %}{% widthratio stats.response_rate 1 100 %}%{% else %}—{% endif %}</div><div class="muted small">Got a reply</div></div>
-  <div class="card stat"><div class="n">{% if stats.interview_rate is not None %}{% widthratio stats.interview_rate 1 100 %}%{% else %}—{% endif %}</div><div class="muted small">Reached interview</div></div>
-  <div class="card stat"><div class="n">{{ stats.offers }}</div><div class="muted small">Offers</div></div>
-  <div class="card stat"><div class="n">{% if stats.median_days_to_response is not None %}{{ stats.median_days_to_response|floatformat:"0" }}d{% else %}—{% endif %}</div><div class="muted small">Median time to reply</div></div>
+<div class="head">
+  <div>
+    <h1>Applications</h1>
+    <p class="muted small" style="margin:0">{{ total }} tracked{% if stats.active %} · {{ stats.active }} still in progress{% endif %}</p>
+  </div>
 </div>
 
-<div class="split">
-  <div class="card">
-    <h2>Follow up</h2>
-    {% if follow_ups %}
-      <ul class="list">
-        {% for a in follow_ups %}
-          <li><a href="{% url 'detail' a.pk %}">{{ a.role }} · {{ a.company }}</a>
-              <span class="small {% if a.next_follow_up < today %}overdue{% else %}muted{% endif %}">{{ a.next_follow_up|date:"j M" }}</span></li>
-        {% endfor %}
-      </ul>
-    {% else %}<p class="muted small">Nothing due.</p>{% endif %}
+{% if total %}
+<div class="kpis">
+  <div class="card kpi"><div class="n">{{ stats.applied }}</div><div class="sub">Applications sent</div></div>
+  <div class="card kpi">
+    <div class="n">{% if stats.response_rate is not None %}{% widthratio stats.response_rate 1 100 %}%{% else %}—{% endif %}</div>
+    <div class="sub">Got a reply · {{ stats.responded }} of {{ stats.applied }}</div>
   </div>
+  <div class="card kpi">
+    <div class="n">{{ stats.interviewing }}</div>
+    <div class="sub">Reached interview{% if stats.interview_rate %} · {% widthratio stats.interview_rate 1 100 %}%{% endif %}</div>
+  </div>
+  <div class="card kpi"><div class="n">{{ stats.offers }}</div><div class="sub">Offer{{ stats.offers|pluralize }}</div></div>
+  <div class="card kpi">
+    <div class="n">{% if stats.median_days_to_response is not None %}{{ stats.median_days_to_response|floatformat:"0" }} days{% else %}—{% endif %}</div>
+    <div class="sub">Typical time to a reply</div>
+  </div>
+</div>
+
+<div class="card breakdown">
+  <h2 style="margin:0">Where everything stands</h2>
+  <div class="bar" role="img" aria-label="Share of applications by status">
+    {% for g in groups %}{% if g.count %}<span class="tone-{{ g.tone }}" style="width:{{ g.share|stringformat:'s' }}%" title="{{ g.label }}: {{ g.count }}"></span>{% endif %}{% endfor %}
+  </div>
+  <div class="legend">
+    {% for g in groups %}{% if g.count %}
+      <a href="?group={{ g.key }}" class="tone-{{ g.tone }}"><span class="dot"></span>{{ g.label }} <strong>{{ g.count }}</strong></a>
+    {% endif %}{% endfor %}
+  </div>
+</div>
+
+{% if follow_ups or upcoming %}
+<div class="attention">
+  {% if follow_ups %}
+  <div class="card">
+    <h2>Follow up <span class="muted small">· {{ follow_ups|length }}</span></h2>
+    <ul class="mini">
+      {% for a in follow_ups|slice:":5" %}
+        <li><a href="{% url 'detail' a.pk %}">{{ a.company }} · {{ a.role }}</a>
+            <span class="small {% if a.next_follow_up < today %}overdue{% else %}muted{% endif %}">{{ a.next_follow_up|date:"j M" }}</span></li>
+      {% endfor %}
+    </ul>
+    {% if follow_ups|length > 5 %}<p class="small muted" style="margin:8px 0 0">and {{ follow_ups|length|add:"-5" }} more</p>{% endif %}
+  </div>
+  {% endif %}
+  {% if upcoming %}
   <div class="card">
     <h2>Coming up</h2>
-    {% if upcoming %}
-      <ul class="list">
-        {% for iv in upcoming %}
-          <li><a href="{% url 'detail' iv.application.pk %}">{{ iv.get_kind_display }} · {{ iv.application.company }}</a>
-              <span class="small muted">{{ iv.scheduled_at|date:"D j M, H:i" }}</span></li>
-        {% endfor %}
-      </ul>
-    {% else %}<p class="muted small">No interviews booked.</p>{% endif %}
-  </div>
-</div>
-
-<div class="board">
-  {% for col in columns %}
-    <section class="col">
-      <h2><span>{{ col.label }}</span><span>{{ col.apps|length }}</span></h2>
-      {% for a in col.apps %}
-        <a class="card app" href="{% url 'detail' a.pk %}">
-          <div class="role">{{ a.role }}</div>
-          <div class="muted small">{{ a.company }}{% if a.location %} · {{ a.location }}{% endif %}</div>
-          {% if a.applied_on %}<div class="muted small">Applied {{ a.applied_on|date:"j M" }}</div>{% endif %}
-        </a>
-      {% empty %}
-        <p class="muted small">—</p>
+    <ul class="mini">
+      {% for iv in upcoming %}
+        <li><a href="{% url 'detail' iv.application.pk %}">{{ iv.get_kind_display }} · {{ iv.application.company }}</a>
+            <span class="small muted">{{ iv.scheduled_at|date:"D j M, H:i" }}</span></li>
       {% endfor %}
-    </section>
-  {% endfor %}
-</div>
-
-{% if stats.by_source %}
-  <div class="card" style="margin-top:18px;max-width:520px">
-    <h2>Reply rate by source</h2>
-    <table>
-      <tr><th>Source</th><th class="num">Applied</th><th class="num">Replied</th><th class="num">Rate</th></tr>
-      {% for s in stats.by_source %}
-        <tr><td>{{ s.label }}</td><td class="num">{{ s.applied }}</td><td class="num">{{ s.responded }}</td>
-            <td class="num">{% widthratio s.response_rate 1 100 %}%</td></tr>
-      {% endfor %}
-    </table>
+    </ul>
   </div>
+  {% endif %}
+</div>
 {% endif %}
+{% endif %}
+
+<div class="toolbar">
+  <nav class="tabs" aria-label="Filter by status">
+    <a class="tab {% if selected == 'all' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}{% endif %}">All <span class="c">{{ total }}</span></a>
+    {% for g in groups %}{% if g.count or selected == g.key %}
+      <a class="tab {% if selected == g.key %}on{% endif %}" href="?group={{ g.key }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ g.label }} <span class="c">{{ g.count }}</span></a>
+    {% endif %}{% endfor %}
+  </nav>
+  <form class="search" method="get">
+    {% if selected != 'all' %}<input type="hidden" name="group" value="{{ selected }}">{% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Search company or role" aria-label="Search">
+  </form>
+</div>
+
+<div class="card list">
+  {% if rows %}
+    <div class="row headrow"><span>Role</span><span>Status</span><span class="hide-sm">Applied</span><span class="hide-sm">Last update</span><span class="hide-sm">Source</span></div>
+    {% for r in rows %}{% with a=r.app %}
+      <a class="row" href="{% url 'detail' a.pk %}">
+        <div class="who"><div class="role">{{ a.role }}</div><div class="co">{{ a.company }}{% if a.location %} · {{ a.location }}{% endif %}</div></div>
+        <span class="badge tone-{{ r.tone }}"><span class="dot"></span>{{ a.get_stage_display }}</span>
+        <span class="cell hide-sm">{{ a.applied_on|date:"j M Y"|default:"—" }}</span>
+        <span class="cell hide-sm">{{ a.last_activity|date:"j M Y"|default:"—" }}</span>
+        <span class="cell hide-sm">{{ a.get_source_display }}</span>
+      </a>
+    {% endwith %}{% endfor %}
+  {% elif total %}
+    <p class="empty">Nothing matches{% if q %} “{{ q }}”{% endif %}.</p>
+  {% else %}
+    <p class="empty">No applications yet. <a href="{% url 'add' %}">Add one</a> or <a href="{% url 'import' %}">import a spreadsheet</a>.</p>
+  {% endif %}
+</div>
 {% endblock %}

@@ -2,8 +2,9 @@ import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Prefetch, Q
+from django.db.models import Count, F, Max, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from rest_framework import mixins, parsers, permissions, status, viewsets
@@ -13,7 +14,7 @@ from rest_framework.views import APIView
 
 from . import services
 from .forms import ApplicationForm, EditApplicationForm, ImportForm, InterviewForm, MoveForm
-from .models import ACTIVE_STAGES, CLOSED_STAGES, Application, Company, Interview, Stage
+from .models import ACTIVE_STAGES, STAGE_TONE, STATUS_GROUPS, Application, Company, Interview, Stage
 from .serializers import (
     ApplicationDetailSerializer,
     ApplicationSerializer,
@@ -130,18 +131,39 @@ def _own_app(request, pk):
 
 @login_required
 def dashboard(request):
-    apps = Application.objects.filter(owner=request.user).select_related("company")
-    columns = [
-        {"stage": stage, "label": Stage(stage).label, "apps": [a for a in apps if a.stage == stage]}
-        for stage in ACTIVE_STAGES
-    ]
+    all_apps = Application.objects.filter(owner=request.user)
+    counts = dict(all_apps.values_list("stage").annotate(n=Count("id")).order_by())
+    total = sum(counts.values())
+
+    groups = []
+    for key, label, stages, tone in STATUS_GROUPS:
+        n = sum(counts.get(s, 0) for s in stages)
+        groups.append({"key": key, "label": label, "count": n, "tone": tone,
+                       "share": round(100 * n / total, 1) if total else 0})
+
+    selected = request.GET.get("group", "all")
+    if selected not in {g["key"] for g in groups}:
+        selected = "all"
+    q = request.GET.get("q", "").strip()
+
+    apps = all_apps.select_related("company").annotate(last_activity=Max("changes__changed_at"))
+    if selected != "all":
+        apps = apps.filter(stage__in=next(stages for key, _, stages, _ in STATUS_GROUPS if key == selected))
+    if q:
+        apps = apps.filter(Q(role__icontains=q) | Q(company__name__icontains=q) | Q(notes__icontains=q))
+    apps = apps.order_by(F("last_activity").desc(nulls_last=True), "-applied_on")
+
+    rows = [{"app": a, "tone": STAGE_TONE.get(a.stage, "muted")} for a in apps]
     upcoming = (
         Interview.objects.filter(application__owner=request.user, scheduled_at__gte=timezone.now())
         .select_related("application__company")[:5]
     )
     return render(request, "tracker/dashboard.html", {
-        "columns": columns,
-        "closed_count": sum(1 for a in apps if a.stage in CLOSED_STAGES),
+        "total": total,
+        "groups": groups,
+        "selected": selected,
+        "q": q,
+        "rows": rows,
         "follow_ups": services.follow_ups_due(request.user),
         "upcoming": upcoming,
         "stats": services.pipeline_stats(request.user),
@@ -151,9 +173,8 @@ def dashboard(request):
 
 @login_required
 def closed(request):
-    apps = (Application.objects.filter(owner=request.user, stage__in=CLOSED_STAGES)
-            .select_related("company").order_by("-updated_at"))
-    return render(request, "tracker/closed.html", {"apps": apps})
+    """Old URL from before the dashboard had filters."""
+    return redirect(f"{reverse('dashboard')}?group=rejected")
 
 
 @login_required
@@ -230,5 +251,5 @@ def import_view(request):
     form = ImportForm(request.POST or None, request.FILES or None)
     result = None
     if request.method == "POST" and form.is_valid():
-        result = services.import_csv(request.user, form.cleaned_data["file"])
+        result = services.import_csv(request.user, form.cleaned_data["file"], replace=form.cleaned_data["replace"])
     return render(request, "tracker/import.html", {"form": form, "result": result})

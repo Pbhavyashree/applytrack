@@ -8,10 +8,12 @@
     :root {
       --bg: #f5f5f2; --card: #fff; --ink: #1c1c1a; --muted: #6a6963; --line: #e3e1da; --accent: #2f4fbf;
       --good: #1f7a4d; --warn: #a86b12; --bad: #a33a3a;
+      --t-progress: #2f4fbf; --t-interview: #7a3fb8; --t-good: #1f7a4d; --t-bad: #b2453f; --t-muted: #8a887f;
     }
     @media (prefers-color-scheme: dark) {
       :root { --bg: #151514; --card: #1f1f1d; --ink: #f0eee7; --muted: #a19f97; --line: #33322e;
-              --accent: #8ea6ff; --good: #55c08c; --warn: #e0a948; --bad: #e07272; }
+              --accent: #8ea6ff; --good: #55c08c; --warn: #e0a948; --bad: #e07272;
+              --t-progress: #8ea6ff; --t-interview: #c49cf2; --t-good: #55c08c; --t-bad: #e07f79; --t-muted: #8f8d85; }
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--ink);
@@ -53,8 +55,7 @@
     <a class="brand" href="{% url 'dashboard' %}">Applytrack</a>
     {% if user.is_authenticated %}
       <nav>
-        <a href="{% url 'dashboard' %}">Pipeline</a>
-        <a href="{% url 'closed' %}">Closed</a>
+        <a href="{% url 'dashboard' %}">Applications</a>
         <a href="{% url 'import' %}">Import</a>
         <a href="{% url 'add' %}" class="btn btn-primary">Add</a>
         <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Sign out</button></form>

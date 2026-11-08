@@ -135,7 +135,7 @@ Hafen Systems,Data Engineer,On hold,2026-10-21,,
 def test_import_maps_columns_and_values(user):
     result = services.import_csv(user, CSV)
     assert (result.created, result.skipped) == (3, 0)
-    assert result.errors == ["Row 5: unknown stage 'On hold'"]
+    assert result.errors == ["Row 5: unknown status 'On hold'"]
     kiez = Application.objects.get(company__name="Kiezbank")
     assert (kiez.stage, kiez.applied_on, kiez.source) == (Stage.REJECTED, datetime.date(2026, 10, 14), Source.LINKEDIN)
     assert Application.objects.get(company__name="Brightgrid").source == Source.JOB_BOARD
@@ -182,3 +182,66 @@ def test_deleting_a_user_removes_their_data_but_companies_stay_protected(make_ap
         app.company.delete()
     user.delete()
     assert not Application.objects.exists() and not Company.objects.exists()
+
+
+RICH_CSV = """Company,Role,Status,Reached,Date applied,Response date
+IBM,Consultant,Rejected,Screening,01.05.2026,29.05.2026
+Amazon,Ops Supervisor,Rejected,Interview,,26.05.2026
+Young Engineers,Instructor,Accepted,,21.08.2026,24.08.2026
+Kiezbank,Backend Engineer,Applied,,30.10.2026,
+Brightgrid,Dev,Rejected,,10.10.2026,15.10.2026
+"""
+
+
+def test_import_reached_stage_and_response_date_feed_the_stats(user):
+    result = services.import_csv(user, RICH_CSV)
+    assert result.created == 5 and result.errors == []
+    ibm = Application.objects.get(company__name="IBM")
+    assert list(ibm.changes.values_list("to_stage", flat=True)) == ["saved", "applied", "screening", "rejected"]
+    assert not ibm.changes.get(to_stage="rejected").backfilled
+    young = Application.objects.get(company__name="Young Engineers")
+    assert list(young.changes.values_list("to_stage", flat=True)) == ["saved", "applied", "offer", "accepted"]
+    stats = services.pipeline_stats(user)
+    # All five went out, including Amazon whose applied date is unknown.
+    assert stats.applied == 5 and stats.offers == 1 and stats.interviewing == 1
+    # Rejections at 28 and 5 days count as replies with real dates.
+    assert stats.median_days_to_response == 16.5
+
+
+def test_import_sets_follow_up_for_waiting_applications(user):
+    services.import_csv(user, RICH_CSV)
+    kiez = Application.objects.get(company__name="Kiezbank")
+    assert kiez.next_follow_up == datetime.date(2026, 11, 6)
+    assert Application.objects.get(company__name="IBM").next_follow_up is None
+
+
+def test_import_rejects_response_before_application(user):
+    result = services.import_csv(user, "Company,Role,Date applied,Response date\nX,Y,10.10.2026,01.10.2026\n")
+    assert result.created == 0 and "before the applied date" in result.errors[0]
+
+
+def test_import_replace_swaps_out_only_this_users_data(make_app, user, other_user):
+    make_app(company="Old Co")
+    make_app(company="Theirs", owner=other_user)
+    result = services.import_csv(user, RICH_CSV, replace=True)
+    assert result.replaced == 1 and result.created == 5
+    assert not Application.objects.filter(owner=user, company__name="Old Co").exists()
+    assert not Company.objects.filter(owner=user, name="Old Co").exists()
+    assert Application.objects.filter(owner=other_user).count() == 1
+
+
+def test_import_replace_with_unreadable_file_keeps_existing_data(make_app, user):
+    make_app(company="Keep me")
+    result = services.import_csv(user, "nonsense\n1\n", replace=True)
+    assert result.errors and Application.objects.filter(owner=user).count() == 1
+
+
+def test_withdrawn_before_applying_does_not_count_as_applied(make_app, user):
+    services.move_to_stage(make_app(stage=Stage.SAVED), Stage.WITHDRAWN)
+    assert services.pipeline_stats(user).applied == 0
+
+
+def test_import_without_applied_date_is_dated_by_the_reply(user):
+    services.import_csv(user, "Company,Role,Status,Response date\nWempe,Dev,Rejected,04.06.2026\n")
+    app = Application.objects.get()
+    assert {c.changed_at.date() for c in app.changes.all()} == {datetime.date(2026, 6, 4)}

@@ -143,7 +143,9 @@ def pipeline_stats(owner, since: datetime.date | None = None) -> Stats:
         active=apps.filter(stage__in=ACTIVE_STAGES).count(),
     )
 
-    applied = apps.filter(applied_on__isnull=False)
+    # "Applied" means the history shows the application went out, even when
+    # the exact date is unknown (e.g. only the company's reply survived).
+    applied = apps.filter(_reached([s for s in Stage if s not in (Stage.SAVED, Stage.WITHDRAWN)]))
     if since:
         applied = applied.filter(applied_on__gte=since)
     applied = applied.annotate(
@@ -166,7 +168,7 @@ def pipeline_stats(owner, since: datetime.date | None = None) -> Stats:
         counts = per_source.setdefault(app.source, [0, 0])
         counts[0] += 1
         counts[1] += app.responded
-        if app.first_response:
+        if app.first_response and app.applied_on:
             gaps.append((timezone.localtime(app.first_response).date() - app.applied_on).days)
 
     stats.median_days_to_response = statistics.median(gaps) if gaps else None
@@ -187,22 +189,28 @@ COLUMN_ALIASES = {
     "source": {"source", "found via", "channel"},
     "applied_on": {"applied", "applied on", "date applied", "date"},
     "stage": {"stage", "status"},
+    "reached": {"reached", "furthest stage", "highest stage", "got to"},
+    "responded_on": {"response date", "reply date", "responded on", "outcome date", "last update"},
     "notes": {"notes", "comments"},
 }
 STAGE_ALIASES = {s.label.lower(): s.value for s in Stage} | {s.value: s.value for s in Stage} | {
     "interview": Stage.INTERVIEW, "no response": Stage.GHOSTED, "ghosted": Stage.GHOSTED,
-    "rejection": Stage.REJECTED, "phone screen": Stage.SCREENING,
+    "rejection": Stage.REJECTED, "phone screen": Stage.SCREENING, "hired": Stage.ACCEPTED,
 }
 SOURCE_ALIASES = {s.label.lower(): s.value for s in Source} | {s.value: s.value for s in Source} | {
     "stepstone": Source.JOB_BOARD, "indeed": Source.JOB_BOARD, "xing": Source.JOB_BOARD, "website": Source.COMPANY_SITE,
 }
 DATE_FORMATS = ["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"]
+# Order of the "progress" stages, used to fill in history between applying
+# and the final outcome.
+PROGRESS = [Stage.SCREENING, Stage.INTERVIEW, Stage.OFFER]
 
 
 @dataclass
 class ImportResult:
     created: int = 0
     skipped: int = 0
+    replaced: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -215,12 +223,25 @@ def _parse_date(value: str) -> datetime.date | None:
     raise ValueError(f"unrecognised date {value!r}")
 
 
-def import_csv(owner, text: str) -> ImportResult:
+def _stage(text: str, column: str) -> str | None:
+    if not text:
+        return None
+    stage = STAGE_ALIASES.get(text.lower())
+    if stage is None:
+        raise ValueError(f"unknown {column} {text!r}")
+    return stage
+
+
+@transaction.atomic
+def import_csv(owner, text: str, replace: bool = False) -> ImportResult:
     """Import applications from a spreadsheet export.
 
     Column names are matched loosely ("Status" or "Stage", "Position" or
     "Role"). Rows already imported are skipped, so re-running is safe.
     Each row is all-or-nothing; a bad row is reported and the rest continue.
+
+    With replace=True the user's existing applications are deleted first, in
+    the same transaction: if the file can't be read at all, nothing is lost.
     """
     result = ImportResult()
     text = text.lstrip("\ufeff")
@@ -237,6 +258,11 @@ def import_csv(owner, text: str) -> ImportResult:
         result.errors.append("CSV needs at least a company and a role column.")
         return result
 
+    if replace:
+        result.replaced = Application.objects.filter(owner=owner).count()
+        Application.objects.filter(owner=owner).delete()
+        Company.objects.filter(owner=owner, applications__isnull=True).delete()
+
     for line_no, raw in enumerate(reader, start=2):
         row = {mapping[k]: (v or "").strip() for k, v in raw.items() if k in mapping}
         try:
@@ -250,14 +276,21 @@ def import_csv(owner, text: str) -> ImportResult:
     return result
 
 
+def _at_nine(day: datetime.date) -> datetime.datetime:
+    return timezone.make_aware(datetime.datetime.combine(day, datetime.time(9)))
+
+
 def _import_row(owner, row: dict) -> bool:
     if not row.get("company") or not row.get("role"):
         raise ValueError("company and role are required")
     applied_on = _parse_date(row["applied_on"]) if row.get("applied_on") else None
-    stage_text = row.get("stage", "").lower()
-    stage = STAGE_ALIASES.get(stage_text) if stage_text else (Stage.APPLIED if applied_on else Stage.SAVED)
-    if stage is None:
-        raise ValueError(f"unknown stage {row['stage']!r}")
+    responded_on = _parse_date(row["responded_on"]) if row.get("responded_on") else None
+    stage = _stage(row.get("stage", ""), "status") or (Stage.APPLIED if applied_on else Stage.SAVED)
+    reached = _stage(row.get("reached", ""), "reached stage")
+    if reached and reached not in PROGRESS:
+        raise ValueError(f"reached stage must be screening, interview or offer, not {row['reached']!r}")
+    if applied_on and responded_on and responded_on < applied_on:
+        raise ValueError("response date is before the applied date")
     source = SOURCE_ALIASES.get(row.get("source", "").lower(), Source.OTHER)
 
     if Application.objects.filter(
@@ -267,23 +300,38 @@ def _import_row(owner, row: dict) -> bool:
 
     company = Company.objects.filter(owner=owner, name__iexact=row["company"]).first()
     company = company or Company.objects.create(owner=owner, name=row["company"])
+    active = stage in ACTIVE_STAGES
     app = Application.objects.create(
         owner=owner, company=company, role=row["role"], job_url=row.get("job_url", ""),
         location=row.get("location", ""), source=source, stage=stage, applied_on=applied_on,
+        next_follow_up=applied_on + FOLLOW_UP_AFTER if active and stage == Stage.APPLIED and applied_on else None,
         notes=row.get("notes", ""),
     )
-    # Reconstruct a minimal history. The date of a later stage is unknown,
-    # so that step is flagged as backfilled and kept out of timing stats.
+
+    # Rebuild the history: saved -> applied -> progress stages reached -> outcome.
+    # A step gets a real date only when the file gives one; otherwise it is
+    # flagged as backfilled and kept out of timing statistics.
+    # Without an applied date, anchor the history on the reply date so the
+    # application doesn't look like it happened today.
+    anchor = applied_on or responded_on
+    start = _at_nine(anchor) if anchor else timezone.now()
+    steps = [(Stage.SAVED, start, False)]
     if applied_on:
-        when = timezone.make_aware(datetime.datetime.combine(applied_on, datetime.time(9)))
-    else:
-        when = timezone.now()
-    history = [("", Stage.SAVED, False)]
-    if applied_on:
-        history.append((Stage.SAVED, Stage.APPLIED, False))
-    if history[-1][1] != stage:
-        history.append((history[-1][1], stage, True))
-    for from_stage, to_stage, backfilled in history:
-        StageChange.objects.create(application=app, from_stage=from_stage, to_stage=to_stage,
+        steps.append((Stage.APPLIED, start, False))
+    # Only stages the file actually states, never the ones in between: an
+    # accepted offer doesn't prove there was a separate screening call.
+    progress = {s for s in (reached, stage) if s in PROGRESS}
+    if stage in (Stage.ACCEPTED, Stage.DECLINED):
+        progress.add(Stage.OFFER)
+    outcome_at = _at_nine(responded_on) if responded_on else start
+    for step in sorted(progress, key=PROGRESS.index):
+        steps.append((step, outcome_at, not (step == stage and responded_on)))
+    if stage not in [s for s, _, _ in steps]:
+        steps.append((stage, outcome_at, responded_on is None))
+
+    previous = ""
+    for to_stage, when, backfilled in steps:
+        StageChange.objects.create(application=app, from_stage=previous, to_stage=to_stage,
                                    changed_at=when, backfilled=backfilled, note="Imported")
+        previous = to_stage
     return True

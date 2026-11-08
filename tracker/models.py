@@ -48,6 +48,19 @@ CLOSED_STAGES = [s for s in Stage if s not in ACTIVE_STAGES]
 RESPONSE_STAGES = [Stage.SCREENING, Stage.INTERVIEW, Stage.OFFER, Stage.REJECTED]
 
 
+# How the dashboard groups stages. Each group has a key (used in the URL),
+# a label, the stages it covers, and a tone for its colour.
+STATUS_GROUPS = [
+    ("active", "In progress", [Stage.SAVED, Stage.APPLIED, Stage.SCREENING], "progress"),
+    ("interviewing", "Interviewing", [Stage.INTERVIEW], "interview"),
+    ("offers", "Offers & hired", [Stage.OFFER, Stage.ACCEPTED], "good"),
+    ("rejected", "Rejected", [Stage.REJECTED], "bad"),
+    ("noreply", "No reply", [Stage.GHOSTED], "muted"),
+    ("withdrawn", "Withdrawn & declined", [Stage.WITHDRAWN, Stage.DECLINED], "muted"),
+]
+STAGE_TONE = {stage: tone for _, _, stages, tone in STATUS_GROUPS for stage in stages}
+
+
 class Source(models.TextChoices):
     LINKEDIN = "linkedin", "LinkedIn"
     COMPANY_SITE = "company_site", "Company website"

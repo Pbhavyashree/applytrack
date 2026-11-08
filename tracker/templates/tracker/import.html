@@ -4,7 +4,8 @@
 <h1>Import from a spreadsheet</h1>
 <p class="muted" style="max-width:640px">Export your tracker as CSV. Columns are matched by name, e.g. <em>Company</em>,
   <em>Role</em> or <em>Position</em>, <em>Status</em> or <em>Stage</em>, <em>Date applied</em>, <em>Source</em>, <em>Link</em>,
-  <em>Location</em>, <em>Notes</em>. Dates can be 2026-10-14 or 14.10.2026. Rows already imported are skipped, so re-uploading is safe.</p>
+  <em>Location</em>, <em>Notes</em>. Optional: <em>Reached</em> (the furthest stage before the outcome: Screening, Interview or Offer) and
+  <em>Response date</em> (when the final answer came), which make the interview rate and reply time accurate. Dates can be 2026-10-14 or 14.10.2026. Rows already imported are skipped, so re-uploading is safe.</p>
 
 <form method="post" enctype="multipart/form-data" class="card" style="max-width:560px;margin-top:12px">
   {% csrf_token %}{{ form.as_p }}
@@ -13,7 +14,7 @@
 
 {% if result %}
   <div class="card" style="max-width:560px;margin-top:12px">
-    <p><strong>{{ result.created }}</strong> imported · <strong>{{ result.skipped }}</strong> already there</p>
+    <p>{% if result.replaced %}<strong>{{ result.replaced }}</strong> replaced · {% endif %}<strong>{{ result.created }}</strong> imported · <strong>{{ result.skipped }}</strong> already there</p>
     {% if result.errors %}
       <ul class="errorlist">{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
     {% endif %}

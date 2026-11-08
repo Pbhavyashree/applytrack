@@ -59,6 +59,11 @@ class InterviewForm(forms.ModelForm):
 
 class ImportForm(forms.Form):
     file = forms.FileField(label="CSV file")
+    replace = forms.BooleanField(
+        required=False,
+        label="Replace all my current applications with this file",
+        help_text="Deletes everything you have in Applytrack first, including notes and interviews you added by hand.",
+    )
 
     def clean_file(self):
         f = self.cleaned_data["file"]
