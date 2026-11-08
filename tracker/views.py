@@ -13,8 +13,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
-from .forms import ApplicationForm, EditApplicationForm, ImportForm, InterviewForm, MoveForm
-from .models import ACTIVE_STAGES, STAGE_TONE, STATUS_GROUPS, Application, Company, Interview, Stage
+from .forms import ApplicationForm, EditApplicationForm, ImportForm, InterviewForm, MoveForm, SettingsForm
+from .models import ACTIVE_STAGES, STAGE_TONE, STATUS_GROUPS, Application, Company, Interview, Stage, UserSettings
 from .serializers import (
     ApplicationDetailSerializer,
     ApplicationSerializer,
@@ -253,3 +253,14 @@ def import_view(request):
     if request.method == "POST" and form.is_valid():
         result = services.import_csv(request.user, form.cleaned_data["file"], replace=form.cleaned_data["replace"])
     return render(request, "tracker/import.html", {"form": form, "result": result})
+
+
+@login_required
+def settings_view(request):
+    prefs, _ = UserSettings.objects.get_or_create(user=request.user)
+    form = SettingsForm(request.POST or None, instance=prefs)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Settings saved.")
+        return redirect("settings")
+    return render(request, "tracker/settings.html", {"form": form})

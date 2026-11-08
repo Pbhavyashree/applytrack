@@ -20,6 +20,7 @@ urlpatterns = [
     path("applications/<int:pk>/move/", views.move, name="move"),
     path("applications/<int:pk>/interviews/", views.add_interview, name="add-interview"),
     path("import/", views.import_view, name="import"),
+    path("settings/", views.settings_view, name="settings"),
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("admin/", admin.site.urls),

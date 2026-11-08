@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Application, Interview, Stage
+from .models import Application, Interview, Stage, UserSettings
 
 
 def job_url_field():
@@ -73,3 +73,11 @@ class ImportForm(forms.Form):
             return f.read().decode("utf-8-sig")
         except UnicodeDecodeError as exc:
             raise forms.ValidationError("Save the spreadsheet as CSV (UTF-8).") from exc
+
+
+class SettingsForm(forms.ModelForm):
+    class Meta:
+        model = UserSettings
+        fields = ["theme"]
+        widgets = {"theme": forms.RadioSelect}
+        labels = {"theme": "Appearance"}

@@ -5,7 +5,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 
 from . import services
-from .models import ACTIVE_STAGES, Application, Company, Interview, Stage, StageChange
+from .models import ACTIVE_STAGES, Application, Company, Interview, Stage, StageChange, UserSettings
 
 admin.site.site_header = "Applytrack"
 admin.site.site_title = "Applytrack admin"
@@ -133,3 +133,9 @@ class InterviewAdmin(OwnedAdmin):
     list_select_related = ["application__company"]
     date_hierarchy = "scheduled_at"
     raw_id_fields = ["application"]
+
+
+@admin.register(UserSettings)
+class UserSettingsAdmin(OwnedAdmin):
+    owner_path = "user"
+    list_display = ["user", "theme"]

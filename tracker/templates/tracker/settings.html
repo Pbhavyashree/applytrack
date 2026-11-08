@@ -1,0 +1,35 @@
+{% extends "tracker/base.html" %}
+{% block title %}Settings · Applytrack{% endblock %}
+{% block head %}
+<style>
+  .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 16px; }
+  .choice { position: relative; display: block; cursor: pointer; font-weight: 600; margin: 0; }
+  .choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .choice .box { display: block; border: 2px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
+  .choice input:checked + .box { border-color: var(--accent); }
+  .choice input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .preview { display: block; height: 64px; border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--line); overflow: hidden; }
+  .preview i { display: block; height: 14px; margin: 8px; border-radius: 4px; }
+  .pv-light { background: #f5f5f2; } .pv-light i { background: #fff; box-shadow: 0 0 0 1px #e3e1da; }
+  .pv-dark { background: #151514; } .pv-dark i { background: #1f1f1d; box-shadow: 0 0 0 1px #33322e; }
+  .pv-system { background: linear-gradient(90deg, #f5f5f2 50%, #151514 50%); }
+  .pv-system i { background: linear-gradient(90deg, #fff 50%, #1f1f1d 50%); }
+</style>
+{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<form method="post" class="card" style="max-width:560px;margin-top:12px">
+  {% csrf_token %}
+  <h2>Appearance</h2>
+  <p class="muted small" style="margin:0">Saved to your account, so it applies on every device you sign in from.</p>
+  <div class="choices">
+    {% for radio in form.theme %}
+      <label class="choice">
+        {{ radio.tag }}
+        <span class="box"><span class="preview pv-{{ radio.data.value }}"><i></i><i></i></span>{{ radio.choice_label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+  <button class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

@@ -155,3 +155,27 @@ class Interview(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_kind_display()} — {self.application}"
+
+
+class UserSettings(models.Model):
+    """Per-user preferences, created on first save from the Settings page."""
+
+    class Theme(models.TextChoices):
+        SYSTEM = "system", "Match my device"
+        LIGHT = "light", "Light"
+        DARK = "dark", "Dark"
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tracker_settings")
+    theme = models.CharField(max_length=10, choices=Theme.choices, default=Theme.SYSTEM)
+
+    class Meta:
+        verbose_name_plural = "user settings"
+
+    def __str__(self) -> str:
+        return f"Settings for {self.user}"
+
+    @classmethod
+    def theme_for(cls, user) -> str:
+        if not getattr(user, "is_authenticated", False):
+            return cls.Theme.SYSTEM
+        return cls.objects.filter(user=user).values_list("theme", flat=True).first() or cls.Theme.SYSTEM

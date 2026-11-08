@@ -1,19 +1,31 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{% if theme and theme != "system" %} data-theme="{{ theme }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Applytrack{% endblock %}</title>
   <style>
+    /* Light is the default. Dark applies when the user picks it, or when
+       they chose "Match my device" and the device is in dark mode. */
     :root {
+      color-scheme: light;
       --bg: #f5f5f2; --card: #fff; --ink: #1c1c1a; --muted: #6a6963; --line: #e3e1da; --accent: #2f4fbf;
-      --good: #1f7a4d; --warn: #a86b12; --bad: #a33a3a;
+      --good: #1f7a4d; --warn: #a86b12; --bad: #a33a3a; --on-accent: #fff;
       --t-progress: #2f4fbf; --t-interview: #7a3fb8; --t-good: #1f7a4d; --t-bad: #b2453f; --t-muted: #8a887f;
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #151514; --card: #1f1f1d; --ink: #f0eee7; --muted: #a19f97; --line: #33322e;
-              --accent: #8ea6ff; --good: #55c08c; --warn: #e0a948; --bad: #e07272;
-              --t-progress: #8ea6ff; --t-interview: #c49cf2; --t-good: #55c08c; --t-bad: #e07f79; --t-muted: #8f8d85; }
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --bg: #151514; --card: #1f1f1d; --ink: #f0eee7; --muted: #a19f97; --line: #33322e;
+        --accent: #8ea6ff; --good: #55c08c; --warn: #e0a948; --bad: #e07272; --on-accent: #151514;
+        --t-progress: #8ea6ff; --t-interview: #c49cf2; --t-good: #55c08c; --t-bad: #e07f79; --t-muted: #8f8d85;
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #151514; --card: #1f1f1d; --ink: #f0eee7; --muted: #a19f97; --line: #33322e;
+      --accent: #8ea6ff; --good: #55c08c; --warn: #e0a948; --bad: #e07272; --on-accent: #151514;
+      --t-progress: #8ea6ff; --t-interview: #c49cf2; --t-good: #55c08c; --t-bad: #e07f79; --t-muted: #8f8d85;
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--ink);
@@ -34,7 +46,7 @@
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
     .btn { display: inline-block; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
            background: var(--card); color: var(--ink); font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
-    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     .tag { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 8px; border-radius: 999px;
            border: 1px solid var(--line); color: var(--muted); }
     .messages { list-style: none; padding: 0; margin: 0 0 14px; }
@@ -57,6 +69,7 @@
       <nav>
         <a href="{% url 'dashboard' %}">Applications</a>
         <a href="{% url 'import' %}">Import</a>
+        <a href="{% url 'settings' %}">Settings</a>
         <a href="{% url 'add' %}" class="btn btn-primary">Add</a>
         <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Sign out</button></form>
       </nav>
